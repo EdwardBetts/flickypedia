@@ -48,9 +48,12 @@ def run_with(list_of_filenames: list[str]):
         photo_id = find_flickr_photo_id(existing_sdc)
 
         if photo_id is None:
-            photo_id = find_flickr_photo_id_from_wikitext(
-                wikimedia_api, flickr_api, filename=f"File:{filename}"
-            )
+            try:
+                photo_id = find_flickr_photo_id_from_wikitext(
+                    wikimedia_api, flickr_api, filename=f"File:{filename}"
+                )
+            except ResourceNotFound as e:
+                pass
 
         if photo_id is None:
             print("Could not find a Flickr photo ID in the existing SDC!")
@@ -113,6 +116,9 @@ def run_with(list_of_filenames: list[str]):
             elif a["action"] == "add_qualifiers":
                 claims.append({"id": a["statement_id"], **a["statement"]})
                 affected_properties.append(a["property_id"])
+            elif a["action"] == "replace_statement":
+                claims.append({"id": a["statement_id"], **a["statement"]})
+                affected_properties.append(a["property_id"])
 
         if claims:
             wikimedia_api.add_structured_data(
@@ -120,8 +126,6 @@ def run_with(list_of_filenames: list[str]):
                 data={"claims": claims},
                 summary=f'Update the {", ".join(sorted(affected_properties))} properties in the [[Commons:Structured data|structured data]] based on metadata from Flickr',
             )
-
-
 
 
 @backfillr.command(help="Fix the SDC for a single file.")
@@ -140,7 +144,7 @@ def update_single_file(url: str) -> None:
 @backfillr.command(help="Fix the SDC for multiple files.")
 @click.argument("N")
 def update_multiple_files(n: int) -> None:
-    seen_titles = set(line.strip() for line in open('seen_titles.txt'))
+    seen_titles = set(line.strip() for line in open("seen_titles.txt"))
 
     i = 0
 
@@ -148,13 +152,13 @@ def update_multiple_files(n: int) -> None:
 
     new_titles = []
 
-    for line in open('commonswiki-20231001-flickr_urls3.json'):
+    for line in open("commonswiki-20231001-flickr_urls3.json"):
         data = json.loads(line)
 
-        if data['title'] in seen_titles:
+        if data["title"] in seen_titles:
             continue
         else:
-            new_titles.append(data['title'])
+            new_titles.append(data["title"])
             i += 1
 
         if i >= int(n):
@@ -164,5 +168,5 @@ def update_multiple_files(n: int) -> None:
     run_with(list_of_filenames=new_titles)
 
     for t in new_titles:
-        with open('seen_titles.txt', 'a') as outfile:
-            outfile.write(t + '\n')
+        with open("seen_titles.txt", "a") as outfile:
+            outfile.write(t + "\n")
